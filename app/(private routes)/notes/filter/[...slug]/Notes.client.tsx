@@ -11,7 +11,7 @@ import Pagination from '@/components/Pagination/Pagination';
 // import NoteForm from '@/components/NoteForm/NoteForm';
 
 import SearchBox from '@/components/SearchBox/SearchBox';
-import { fetchNotes } from '@/lib/api';
+import { fetchNotes } from '@/lib/api/clientApi';
 import Loader from '@/components/Loader/Loader';
 import ErrorView from '@/components/ErrorView/ErrorView';
 import Link from 'next/link';

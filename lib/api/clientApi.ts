@@ -1,12 +1,7 @@
-import axios from 'axios';
+import { api } from './api';
 
 import type Note from '@/types/note';
 import type { NoteTag } from '@/types/note';
-
-const noteApi = axios.create({
-  baseURL: '/api',
-  withCredentials: true,
-});
 
 interface FetchNotesParams {
   page?: number;
@@ -24,7 +19,7 @@ export const fetchNotes = async ({
   search,
   tag,
 }: FetchNotesParams): Promise<FetchNotesResponse> => {
-  const response = await noteApi.get<FetchNotesResponse>('/notes', {
+  const response = await api.get<FetchNotesResponse>('/notes', {
     params: {
       page,
       search,
@@ -45,16 +40,16 @@ export const createNote = async ({
   content,
   tag,
 }: CreateNoteData): Promise<Note> => {
-  const response = await noteApi.post<Note>('/notes', { title, content, tag });
+  const response = await api.post<Note>('/notes', { title, content, tag });
   return response.data;
 };
 
 export const fetchNoteById = async (id: string): Promise<Note> => {
-  const response = await noteApi.get<Note>(`/notes/${id}`);
+  const response = await api.get<Note>(`/notes/${id}`);
   return response.data;
 };
 
 export const deleteNote = async (id: string): Promise<Note> => {
-  const response = await noteApi.delete<Note>(`/notes/${id}`);
+  const response = await api.delete<Note>(`/notes/${id}`);
   return response.data;
 };
