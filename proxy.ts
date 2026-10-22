@@ -1,44 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { checkSession } from '@/lib/api/serverApi';
+import { parseSetCookie } from 'cookie';
 
 const privateRoutes = ['/profile', '/notes'];
 const publicRoutes = ['/sign-in', '/sign-up'];
 
-function parseSetCookie(cookieStr: string) {
-  const parts = cookieStr.split(';');
-  const [nameValue] = parts;
-  if (!nameValue) return null;
-
-  const eqIndex = nameValue.indexOf('=');
-  if (eqIndex === -1) return null;
-
-  const name = nameValue.substring(0, eqIndex).trim();
-  const value = nameValue.substring(eqIndex + 1).trim();
-
-  const options: Record<string, string | boolean | number | Date> = {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-  };
-
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i].trim();
-    if (!part) continue;
-
-    const innerEqIndex = part.indexOf('=');
-    if (innerEqIndex === -1) {
-      if (part.toLowerCase() === 'httponly') options.httpOnly = true;
-      if (part.toLowerCase() === 'secure') options.secure = true;
-    } else {
-      const key = part.substring(0, innerEqIndex).trim().toLowerCase();
-      const val = part.substring(innerEqIndex + 1).trim();
-      if (key === 'path') options.path = val;
-      if (key === 'max-age') options.maxAge = parseInt(val, 10);
-    }
-  }
-
-  return { name, value, options };
+// Описываем четкий интерфейс для куки, чтобы избежать explicit-any
+interface ParsedCookie {
+  name: string;
+  value: string;
+  path?: string;
+  expires?: Date;
+  maxAge?: number;
+  domain?: string;
+  secure?: boolean;
+  httpOnly?: boolean;
+  sameSite?: boolean | 'lax' | 'strict' | 'none';
 }
 
 export async function proxy(request: NextRequest) {
@@ -59,11 +37,8 @@ export async function proxy(request: NextRequest) {
 
   let isAuthenticated = false;
 
-  const tokensToSet: Array<{
-    name: string;
-    value: string;
-    options: Record<string, string | boolean | number | Date>;
-  }> = [];
+  // Типизируем массив строго через интерфейс ParsedCookie
+  const tokensToSet: ParsedCookie[] = [];
 
   if (accessToken) {
     isAuthenticated = true;
@@ -85,7 +60,7 @@ export async function proxy(request: NextRequest) {
           cookiesArray.forEach(cookieStr => {
             const parsed = parseSetCookie(cookieStr);
             if (parsed) {
-              tokensToSet.push(parsed);
+              tokensToSet.push(parsed as ParsedCookie);
             }
           });
         }
@@ -110,14 +85,11 @@ export async function proxy(request: NextRequest) {
       nextResponse.cookies.set({
         name: token.name,
         value: token.value,
-        path: typeof token.options.path === 'string' ? token.options.path : '/',
-        httpOnly: !!token.options.httpOnly,
-        secure: process.env.NODE_ENV === 'production' || !!token.options.secure,
+        path: token.path || '/',
+        httpOnly: token.httpOnly ?? true,
+        secure: process.env.NODE_ENV === 'production' || !!token.secure,
         sameSite: 'lax',
-        maxAge:
-          typeof token.options.maxAge === 'number'
-            ? token.options.maxAge
-            : undefined,
+        maxAge: typeof token.maxAge === 'number' ? token.maxAge : undefined,
       });
     });
   }
