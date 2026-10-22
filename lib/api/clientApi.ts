@@ -75,3 +75,17 @@ export const login = async (data: LoginData): Promise<User> => {
   const response = await api.post<User>('/auth/login', data);
   return response.data;
 };
+
+interface CheckSessionRequest {
+  success: boolean;
+}
+
+export const checkSession = async () => {
+  const res = await api.get<CheckSessionRequest>('/auth/session');
+  return res.data.success;
+};
+
+export const getMe = async () => {
+  const { data } = await api.get<User>('/users/me');
+  return data;
+};
