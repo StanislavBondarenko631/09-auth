@@ -89,3 +89,8 @@ export const getMe = async () => {
   const { data } = await api.get<User>('/users/me');
   return data;
 };
+
+export const logout = async () => {
+  const response = await api.post<User>('/auth/logout');
+  return response.data;
+};
