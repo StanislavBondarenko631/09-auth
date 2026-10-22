@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { api } from './api';
 
 import Note from '@/types/note';
+import type User from '@/types/user';
 
 interface FetchNotesParams {
   page?: number;
@@ -55,4 +56,14 @@ export const checkServerSession = async () => {
   });
 
   return res;
+};
+
+export const getMe = async (): Promise<User> => {
+  const cookieStore = await cookies();
+  const response = await api.get<User>('/users/me', {
+    headers: {
+      Cookie: cookieStore.toString(),
+    },
+  });
+  return response.data;
 };
