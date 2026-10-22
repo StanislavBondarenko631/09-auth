@@ -21,9 +21,8 @@ interface ParsedCookie {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ИГНОРИРУЕМ API-ЗАПРОСЫ: Если запрос идет к бэкенду/эндпоинтам авторизации,
-  // мы просто пропускаем его, чтобы избежать CORS-блокировок при редиректах.
-  if (pathname.startsWith('/api')) {
+  // Защитный слой: если запрос случайно просочился, сразу пропускаем его без проверок кук
+  if (pathname.startsWith('/api') || pathname.startsWith('/_next')) {
     return NextResponse.next();
   }
 
@@ -114,6 +113,7 @@ export async function proxy(request: NextRequest) {
   return nextResponse;
 }
 
+// Изменяем матчер: теперь он строго обрабатывает только страницы и игнорирует внутренние запросы /api
 export const config = {
   matcher: ['/profile/:path*', '/notes/:path*', '/sign-in', '/sign-up'],
 };
