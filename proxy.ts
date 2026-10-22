@@ -1,10 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { ResponseCookies } from 'next/dist/server/web/spec-extension/cookies';
 import { checkSession } from '@/lib/api/serverApi';
 
 const privateRoutes = ['/profile', '/notes'];
 const publicRoutes = ['/sign-in', '/sign-up'];
+
+function parseSetCookie(cookieStr: string) {
+  const parts = cookieStr.split(';');
+  const [nameValue] = parts;
+  if (!nameValue) return null;
+
+  const eqIndex = nameValue.indexOf('=');
+  if (eqIndex === -1) return null;
+
+  const name = nameValue.substring(0, eqIndex).trim();
+  const value = nameValue.substring(eqIndex + 1).trim();
+
+  const options: Record<string, string | boolean | number | Date> = {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+  };
+
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i].trim();
+    if (!part) continue;
+
+    const innerEqIndex = part.indexOf('=');
+    if (innerEqIndex === -1) {
+      if (part.toLowerCase() === 'httponly') options.httpOnly = true;
+      if (part.toLowerCase() === 'secure') options.secure = true;
+    } else {
+      const key = part.substring(0, innerEqIndex).trim().toLowerCase();
+      const val = part.substring(innerEqIndex + 1).trim();
+      if (key === 'path') options.path = val;
+      if (key === 'max-age') options.maxAge = parseInt(val, 10);
+    }
+  }
+
+  return { name, value, options };
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -24,13 +59,18 @@ export async function proxy(request: NextRequest) {
 
   let isAuthenticated = false;
 
-  const backendCookies = new ResponseCookies(new Headers());
+  const tokensToSet: Array<{
+    name: string;
+    value: string;
+    options: Record<string, string | boolean | number | Date>;
+  }> = [];
 
   if (accessToken) {
     isAuthenticated = true;
   } else if (refreshToken) {
     try {
       const cookieString = cookieStore.toString();
+
       const response = await checkSession(cookieString);
 
       if (response.status === 200) {
@@ -43,9 +83,10 @@ export async function proxy(request: NextRequest) {
             : [setCookieHeaders];
 
           cookiesArray.forEach(cookieStr => {
-            backendCookies.set('temp', 'temp');
-
-            backendCookies.toString = () => cookieStr;
+            const parsed = parseSetCookie(cookieStr);
+            if (parsed) {
+              tokensToSet.push(parsed);
+            }
           });
         }
       }
@@ -54,38 +95,34 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  let nextResponse: NextResponse;
+
   if (isPrivateRoute && !isAuthenticated) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
+    nextResponse = NextResponse.redirect(new URL('/sign-in', request.url));
+  } else if (isPublicRoute && isAuthenticated) {
+    nextResponse = NextResponse.redirect(new URL('/', request.url));
+  } else {
+    nextResponse = NextResponse.next();
   }
 
-  if (isPublicRoute && isAuthenticated) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-
-  const response = NextResponse.next();
-
-  const backendCookieList = request.headers.get('set-cookie');
-  if (backendCookieList) {
-    const cookiesArray = Array.isArray(backendCookieList)
-      ? backendCookieList
-      : [backendCookieList];
-    cookiesArray.forEach(cookieStr => {
-      const [nameValue] = cookieStr.split(';');
-      const [name, value] = nameValue.split('=');
-      if (name && value) {
-        response.cookies.set({
-          name: name.trim(),
-          value: value.trim(),
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-        });
-      }
+  if (tokensToSet.length > 0) {
+    tokensToSet.forEach(token => {
+      nextResponse.cookies.set({
+        name: token.name,
+        value: token.value,
+        path: typeof token.options.path === 'string' ? token.options.path : '/',
+        httpOnly: !!token.options.httpOnly,
+        secure: process.env.NODE_ENV === 'production' || !!token.options.secure,
+        sameSite: 'lax',
+        maxAge:
+          typeof token.options.maxAge === 'number'
+            ? token.options.maxAge
+            : undefined,
+      });
     });
   }
 
-  return response;
+  return nextResponse;
 }
 
 export const config = {
