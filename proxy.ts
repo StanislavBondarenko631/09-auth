@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { ResponseCookies } from 'next/dist/server/web/spec-extension/cookies';
 import { checkSession } from '@/lib/api/serverApi';
 
 const privateRoutes = ['/profile', '/notes'];
@@ -22,11 +23,8 @@ export async function proxy(request: NextRequest) {
   const refreshToken = cookieStore.get('refreshToken')?.value;
 
   let isAuthenticated = false;
-  let newCookiesToSet: Array<{
-    name: string;
-    value: string;
-    [key: string]: any;
-  }> = [];
+
+  const backendCookies = new ResponseCookies(new Headers());
 
   if (accessToken) {
     isAuthenticated = true;
@@ -45,13 +43,9 @@ export async function proxy(request: NextRequest) {
             : [setCookieHeaders];
 
           cookiesArray.forEach(cookieStr => {
-            const parts = cookieStr.split(';')[0].split('=');
-            if (parts.length === 2) {
-              newCookiesToSet.push({
-                name: parts[0].trim(),
-                value: parts[1].trim(),
-              });
-            }
+            backendCookies.set('temp', 'temp');
+
+            backendCookies.toString = () => cookieStr;
           });
         }
       }
@@ -70,16 +64,24 @@ export async function proxy(request: NextRequest) {
 
   const response = NextResponse.next();
 
-  if (newCookiesToSet.length > 0) {
-    newCookiesToSet.forEach(c => {
-      response.cookies.set({
-        name: c.name,
-        value: c.value,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-      });
+  const backendCookieList = request.headers.get('set-cookie');
+  if (backendCookieList) {
+    const cookiesArray = Array.isArray(backendCookieList)
+      ? backendCookieList
+      : [backendCookieList];
+    cookiesArray.forEach(cookieStr => {
+      const [nameValue] = cookieStr.split(';');
+      const [name, value] = nameValue.split('=');
+      if (name && value) {
+        response.cookies.set({
+          name: name.trim(),
+          value: value.trim(),
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+        });
+      }
     });
   }
 
