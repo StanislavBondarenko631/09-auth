@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { checkSession } from '@/lib/api/serverApi';
-import { parseSetCookie } from 'cookie';
+import { ResponseCookies } from 'next/dist/server/web/spec-extension/cookies';
 
 const privateRoutes = ['/profile', '/notes'];
 const publicRoutes = ['/sign-in', '/sign-up'];
 
-// Описываем четкий интерфейс для куки, чтобы избежать explicit-any
 interface ParsedCookie {
   name: string;
   value: string;
@@ -36,8 +35,6 @@ export async function proxy(request: NextRequest) {
   const refreshToken = cookieStore.get('refreshToken')?.value;
 
   let isAuthenticated = false;
-
-  // Типизируем массив строго через интерфейс ParsedCookie
   const tokensToSet: ParsedCookie[] = [];
 
   if (accessToken) {
@@ -45,7 +42,6 @@ export async function proxy(request: NextRequest) {
   } else if (refreshToken) {
     try {
       const cookieString = cookieStore.toString();
-
       const response = await checkSession(cookieString);
 
       if (response.status === 200) {
@@ -57,11 +53,28 @@ export async function proxy(request: NextRequest) {
             ? setCookieHeaders
             : [setCookieHeaders];
 
+          // Создаем пустой Response для использования безопасного Edge-парсера куки
+          const dummyResponse = new Response();
+
           cookiesArray.forEach(cookieStr => {
-            const parsed = parseSetCookie(cookieStr);
-            if (parsed) {
-              tokensToSet.push(parsed as ParsedCookie);
-            }
+            dummyResponse.headers.append('set-cookie', cookieStr);
+          });
+
+          // Извлекаем куки с помощью официального парсера Next.js, совместимого с Edge Runtime
+          const edgeCookies = new ResponseCookies(dummyResponse.headers);
+          const allParsedCookies = edgeCookies.getAll();
+
+          allParsedCookies.forEach(cookie => {
+            tokensToSet.push({
+              name: cookie.name,
+              value: cookie.value,
+              path: cookie.path,
+              maxAge: cookie.maxAge,
+              domain: cookie.domain,
+              secure: cookie.secure,
+              httpOnly: cookie.httpOnly,
+              sameSite: cookie.sameSite,
+            });
           });
         }
       }
