@@ -94,3 +94,12 @@ export const logout = async () => {
   const response = await api.post<User>('/auth/logout');
   return response.data;
 };
+
+export type UpdateUserData = {
+  username: string;
+};
+
+export const updateMe = async (data: UpdateUserData): Promise<User> => {
+  const response = await api.patch<User>('/users/me', data);
+  return response.data;
+};
