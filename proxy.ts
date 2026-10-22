@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const privateRoutes = ['/profile', '/notes'];
 const publicRoutes = ['/sign-in', '/sign-up'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPrivateRoute = privateRoutes.some(route =>
@@ -18,14 +18,13 @@ export async function middleware(request: NextRequest) {
   let isAuthenticated = false;
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/session`,
+      'https://notehub-api.goit.study/auth/session',
       {
         headers: {
           Cookie: request.headers.get('cookie') || '',
         },
       }
     );
-
     if (response.ok) {
       const data = await response.json();
       if (data && data.email) {
