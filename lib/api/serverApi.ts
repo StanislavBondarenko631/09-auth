@@ -47,15 +47,17 @@ export const fetchNoteById = async (id: string): Promise<Note> => {
   return response.data;
 };
 
-export const checkServerSession = async () => {
-  const cookieStore = await cookies();
-  const res = await api.get('/auth/session', {
-    headers: {
-      Cookie: cookieStore.toString(),
-    },
-  });
+export const checkSession = async (cookieString?: string) => {
+  const headers: Record<string, string> = {};
 
-  return res;
+  if (cookieString) {
+    headers.Cookie = cookieString;
+  } else {
+    const cookieStore = await cookies();
+    headers.Cookie = cookieStore.toString();
+  }
+
+  return await api.get('/auth/session', { headers });
 };
 
 export const getMe = async (): Promise<User> => {

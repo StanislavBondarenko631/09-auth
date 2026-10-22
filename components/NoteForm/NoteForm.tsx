@@ -95,7 +95,7 @@ export default function NoteForm() {
         <button
           type="button"
           className={css.cancelButton}
-          onClick={() => router.push('/notes/filter/all')}
+          onClick={() => router.back()}
         >
           Cancel
         </button>
