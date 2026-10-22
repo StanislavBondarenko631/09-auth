@@ -3,6 +3,8 @@ import { api } from './api';
 import type Note from '@/types/note';
 import type { NoteTag } from '@/types/note';
 
+import User from '@/types/user';
+
 interface FetchNotesParams {
   page?: number;
   search?: string;
@@ -51,5 +53,15 @@ export const fetchNoteById = async (id: string): Promise<Note> => {
 
 export const deleteNote = async (id: string): Promise<Note> => {
   const response = await api.delete<Note>(`/notes/${id}`);
+  return response.data;
+};
+
+interface RegisterData {
+  email: string;
+  password: string;
+}
+
+export const register = async (data: RegisterData): Promise<User> => {
+  const response = await api.post<User>('/auth/register', data);
   return response.data;
 };
