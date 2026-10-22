@@ -5,10 +5,12 @@ import { register } from '@/lib/api/clientApi';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import css from './SignUpPage.module.css';
+import { useAuthStore } from '@/lib/store/authStore';
 
 export default function SignUpPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const setUser = useAuthStore(state => state.setUser);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -19,7 +21,9 @@ export default function SignUpPage() {
     const password = formData.get('password') as string;
 
     try {
-      await register({ email, password });
+      const user = await register({ email, password });
+      setUser(user);
+      router.push('/profile');
 
       router.push('/profile');
     } catch (err) {
