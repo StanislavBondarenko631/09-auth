@@ -21,6 +21,12 @@ interface ParsedCookie {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ИГНОРИРУЕМ API-ЗАПРОСЫ: Если запрос идет к бэкенду/эндпоинтам авторизации,
+  // мы просто пропускаем его, чтобы избежать CORS-блокировок при редиректах.
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+
   const isPrivateRoute = privateRoutes.some(route =>
     pathname.startsWith(route)
   );
@@ -53,14 +59,12 @@ export async function proxy(request: NextRequest) {
             ? setCookieHeaders
             : [setCookieHeaders];
 
-          // Создаем пустой Response для использования безопасного Edge-парсера куки
           const dummyResponse = new Response();
 
           cookiesArray.forEach(cookieStr => {
             dummyResponse.headers.append('set-cookie', cookieStr);
           });
 
-          // Извлекаем куки с помощью официального парсера Next.js, совместимого с Edge Runtime
           const edgeCookies = new ResponseCookies(dummyResponse.headers);
           const allParsedCookies = edgeCookies.getAll();
 
